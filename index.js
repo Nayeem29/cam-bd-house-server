@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 5000;
-const { MongoClient, ServerApiVersion, ObjectId, ObjectID } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const cors = require('cors');
 const res = require('express/lib/response');
 const jwt = require('jsonwebtoken');
@@ -19,11 +19,13 @@ console.log('database is connected');
 
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
+  // console.log(authHeader);
   if (!authHeader) {
     return res.status(401).send({ message: 'unauthorized' })
   }
   const token = authHeader.split(' ')[1];
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+    // console.log(err);
     if (err) {
       return res.status(403).send({ message: 'Forbidden Access' })
     }
@@ -36,26 +38,58 @@ async function run() {
   try {
     await client.connect();
     console.log('database is connected');
-    const cameraCollection = await client.db('products').collection('camera');
-    const reviewCollection = await client.db('products').collection('review');
-    const purchaseCollection = await client.db('products').collection('purchase');
-    const usersCollection = await client.db('products').collection('users');
-    const paymentsCollection = await client.db('products').collection('payments');
+    const cameraCollection = client.db('products').collection('camera');
+    const reviewCollection = client.db('products').collection('review');
+    const purchaseCollection = client.db('products').collection('purchase');
+    const usersCollection = client.db('products').collection('users');
+    const paymentsCollection = client.db('products').collection('payments');
+
+    const verifyAdmin = async (req, res, next) => {
+      const requester = req.decoded.email;
+      const requesterAccount = await usersCollection.findOne({ email: requester });
+      if (requesterAccount.role === 'Admin') {
+        next();
+      } else {
+        res.status(403).send({ message: 'Forbidden' })
+      }
+    }
 
     app.get('/camera', async (req, res) => {
       const result = await cameraCollection.find().toArray();
       res.send(result);
     })
+
     app.get('/camera/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
       const result = await cameraCollection.findOne(query);
       res.send(result);
+    });
+
+    app.delete('/camera/:id', verifyJWT, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await cameraCollection.deleteOne(query);
+      res.send(result);
     })
+
+    app.post('/camera', verifyJWT, verifyAdmin, async (req, res) => {
+      const doc = req.body;
+      const product = await cameraCollection.insertOne(doc);
+      res.send(product);
+    })
+
     app.get('/review', async (req, res) => {
       const result = await reviewCollection.find().toArray();
       res.send(result);
     })
+
+    app.post('/review', verifyJWT, async (req, res) => {
+      const docs = req.body;
+      const review = await reviewCollection.insertOne(docs);
+      res.send(review);
+    })
+
     app.get('/users', verifyJWT, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
@@ -65,18 +99,21 @@ async function run() {
       const result = await purchaseCollection.insertOne(order);
       res.send(result);
     })
-    app.get('/purchaseinfo', verifyJWT, async (req, res) => {
-      const userEmail = req.query.userEmail;
-      // const authorization = req.headers.authorization;
-      const decodedEmail = req.decoded.email;
-      if (decodedEmail === userEmail) {
-        // console.log('auth', authorization);
-        const query = { userEmail: userEmail }
-        const result = await purchaseCollection.find(query).toArray();
-        return res.send(result);
-      } else {
-        return res.status(403).send({ message: 'Forbidden Access' })
-      }
+    app.get('/purchaseinfo', verifyJWT, verifyAdmin, async (req, res) => {
+      // const userEmail = req.query.userEmail;
+      // // const authorization = req.headers.authorization;
+      // const decodedEmail = req.decoded.email;
+      // console.log(userEmail, decodedEmail);
+      // if (decodedEmail === userEmail) {
+      //   // console.log('auth', authorization);
+      //   const query = { userEmail: userEmail }
+      //   const result = await purchaseCollection.find(query).toArray();
+      //   return res.send(result);
+      // } else {
+      //   return res.status(403).send({ message: 'Forbidden Access' })
+      // }
+      const result = await purchaseCollection.find().toArray();
+      res.send(result);
     });
     app.patch('/purchaseinfo/:id', verifyJWT, async (req, res) => {
       const id = req.params.id;
@@ -90,6 +127,14 @@ async function run() {
       }
       const userPayment = await paymentsCollection.insertOne(payment);
       const result = await purchaseCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    })
+
+    app.delete('/purchaseinfo/:id', verifyJWT, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const query = { _id: ObjectId(id) };
+      const result = await purchaseCollection.deleteOne(query);
       res.send(result);
     })
 
@@ -117,20 +162,18 @@ async function run() {
       const isAdmin = user.role === 'Admin';
       res.send({ admin: isAdmin });
     })
-    app.put('/users/admin/:email', async (req, res) => {
+    app.put('/users/admin/:email', verifyJWT, verifyAdmin, async (req, res) => {
       const email = req.params.email;
-      const requester = req.decoded.email;
-      const requesterAccount = await usersCollection.findOne({ email: requester });
-      if (requesterAccount.role === 'Admin') {
-        const filter = { email: email };
-        const updatedUser = {
-          $set: { role: 'Admin' }
-        }
-        const result = await usersCollection.updateOne(filter, updatedUser);
-        return res.send(result);
-      } else {
-        return res.status(403).send({ message: 'Forbidden' });
+      // const requester = req.decoded.email;
+      // const requesterAccount = await usersCollection.findOne({ email: requester });
+
+      const filter = { email: email };
+      const updatedUser = {
+        $set: { role: 'Admin' }
       }
+      const result = await usersCollection.updateOne(filter, updatedUser);
+      return res.send(result);
+
     });
 
     app.put('/users/:email', async (req, res) => {
