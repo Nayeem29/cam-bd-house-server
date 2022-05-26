@@ -99,22 +99,28 @@ async function run() {
       const result = await purchaseCollection.insertOne(order);
       res.send(result);
     })
-    app.get('/purchaseinfo', verifyJWT, verifyAdmin, async (req, res) => {
-      // const userEmail = req.query.userEmail;
-      // // const authorization = req.headers.authorization;
-      // const decodedEmail = req.decoded.email;
-      // console.log(userEmail, decodedEmail);
-      // if (decodedEmail === userEmail) {
-      //   // console.log('auth', authorization);
-      //   const query = { userEmail: userEmail }
-      //   const result = await purchaseCollection.find(query).toArray();
-      //   return res.send(result);
-      // } else {
-      //   return res.status(403).send({ message: 'Forbidden Access' })
-      // }
+    app.get('/purchaseinfo', verifyJWT, async (req, res) => {
       const result = await purchaseCollection.find().toArray();
       res.send(result);
     });
+
+    app.get('/purchase', verifyJWT, async (req, res) => {
+      const userEmail = req.query.userEmail;
+      // const authorization = req.headers.authorization;
+      const decodedEmail = req.decoded.email;
+      // console.log(userEmail, decodedEmail);
+      if (decodedEmail === userEmail) {
+        // console.log('auth', authorization);
+
+        const query = { userEmail: userEmail }
+        const result = await purchaseCollection.find(query).toArray();
+        return res.send(result);
+      } else {
+        return res.status(403).send({ message: 'Forbidden Access' })
+      }
+    })
+
+
     app.patch('/purchaseinfo/:id', verifyJWT, async (req, res) => {
       const id = req.params.id;
       const payment = req.body;
@@ -130,9 +136,9 @@ async function run() {
       res.send(result);
     })
 
-    app.delete('/purchaseinfo/:id', verifyJWT, verifyAdmin, async (req, res) => {
+    app.delete('/purchaseinfo/:id', verifyJWT, async (req, res) => {
       const id = req.params.id;
-      console.log(id);
+      // console.log(id);
       const query = { _id: ObjectId(id) };
       const result = await purchaseCollection.deleteOne(query);
       res.send(result);
@@ -155,6 +161,8 @@ async function run() {
       const result = await purchaseCollection.findOne(query);
       res.send(result);
     })
+
+
 
     app.get('/admin/:email', async (req, res) => {
       const email = req.params.email;
