@@ -4,7 +4,7 @@
 ### Live link : [https://cam-bd-house.web.app/]
 ### Client Git hub: [https://github.com/programming-hero-web-course1/manufacturer-website-client-side-Nayeem29]
 ### Server Git hub: [https://github.com/programming-hero-web-course1/manufacturer-website-server-side-Nayeem29]
-
+#### Admin Access: jhakanaka@hero.com Hero@1234
 ### Functionality and Features:
 
 * This is a manufacturer website for supplying camera parts 
